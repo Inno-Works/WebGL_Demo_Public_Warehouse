@@ -41,6 +41,17 @@
         companyName: "InnoWorks",
         productName: "WebGL_Demo",
         productVersion: "0.1.0",
+        cacheControl: function (url) {
+          // Caching enabled for .data and .bundle files.
+          // Revalidate if file is up to date before loading from cache
+          if (url.match(/\.data/) || url.match(/\.png/) || url.match(/\.glb/)) {
+            return "must-revalidate";
+          }
+
+          // Disable explicit caching for all other files.
+          // Note: the default browser cache may cache them anyway.
+          return "no-store";
+        },
       };
 
       const container = document.querySelector("#unity-container");
