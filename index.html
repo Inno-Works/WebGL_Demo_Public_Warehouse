@@ -8,6 +8,7 @@
     <link rel="shortcut icon" href="TemplateData/favicon.ico">
     <link rel="stylesheet" href="TemplateData/style.css">
     <link rel="stylesheet" href="TemplateData/ReadyPlayerMe/RpmStyle.css">
+    <script src="customCache.js"></script>
 </head>
 <body class="dark">
     <div id="unity-container" class="unity-desktop">
@@ -28,28 +29,66 @@
     </div>
     <div id="unity-fullscreen-button" style="display: none;"></div>
     <script src="TemplateData/ReadyPlayerMe/RpmGlobal.js"></script>
-    <script>
+    <script>     
       const hideFullScreenButton = "1";
       const buildUrl = "Build";
-	  const mobilePixelRatio = "1";
-      const loaderUrl = buildUrl + "/WebGL_Demo_Public_Warehouse.loader.js";
+	    const mobilePixelRatio = "1";
+      const loaderUrl = buildUrl + "/WebGL_Demo_Public.loader.js";
       const config = {
-        dataUrl: buildUrl + "/WebGL_Demo_Public_Warehouse.data.unityweb",
-        frameworkUrl: buildUrl + "/WebGL_Demo_Public_Warehouse.framework.js.unityweb",
-        codeUrl: buildUrl + "/WebGL_Demo_Public_Warehouse.wasm.unityweb",
+        dataUrl: buildUrl + "/WebGL_Demo_Public.data.unityweb",
+        frameworkUrl: buildUrl + "/WebGL_Demo_Public.framework.js.unityweb",
+        codeUrl: buildUrl + "/WebGL_Demo_Public.wasm.unityweb",
         streamingAssetsUrl: "StreamingAssets",
         companyName: "InnoWorks",
         productName: "WebGL_Demo",
         productVersion: "0.1.0",
-        cacheControl: function (url) {
-          // Caching enabled for .data and .bundle files.
-          // Revalidate if file is up to date before loading from cache
-          if (url.match(/\.data/) || url.match(/\.png/) || url.match(/\.glb/)) {
-            return "must-revalidate";
+        normalizeUrl: function(url) {
+          // Check if the url is relative (doesn't start with http:// or https://)
+          if (!/^https?:\/\//i.test(url)) {
+            // If it's relative, we don't need to normalize it
+            return url;
           }
 
-          // Disable explicit caching for all other files.
-          // Note: the default browser cache may cache them anyway.
+          try {
+            const parsedUrl = new URL(url);
+            const originalParams = parsedUrl.search;
+            
+            // Remove specific query parameters
+            ['skt', 'ske', 'se', 'sig'].forEach(param => parsedUrl.searchParams.delete(param));
+            
+            // Reconstruct the URL manually to preserve encoding
+            let normalizedUrl = parsedUrl.protocol + '//' + parsedUrl.host + parsedUrl.pathname;
+            
+            // Append remaining query parameters, ensuring they remain encoded
+            const remainingParams = Array.from(parsedUrl.searchParams.entries());
+            if (remainingParams.length > 0) {
+              normalizedUrl += '?' + remainingParams.map(([key, value]) => 
+                `${encodeURIComponent(key)}=${encodeURIComponent(value)}`
+              ).join('&');
+            }
+            
+            // Append hash if present
+            if (parsedUrl.hash) {
+              normalizedUrl += parsedUrl.hash;
+            }
+            
+            return normalizedUrl;
+          } catch (error) {
+            console.warn('Failed to normalize URL:', url, error);
+            return url; // Return the original URL if parsing fails
+          }
+        },
+  
+        cacheControl: function (url) {
+          const normalizedUrl = this.normalizeUrl(url);
+
+          if (normalizedUrl.match(/\.(data|png|glb)$/)) {
+            return {
+              url: normalizedUrl,
+              policy: "must-revalidate"
+            };
+          }
+
           return "no-store";
         },
       };
@@ -83,29 +122,33 @@
       }
       loadingCover.style.display = "";
 
-      const script = document.createElement("script");
-      script.src = loaderUrl;
-      script.onload = () => {
-        createUnityInstance(canvas, config, (progress) => {
-          spinner.style.display = "none";
-          progressBarEmpty.style.display = "";
-          progressBarFull.style.width = `${100 * progress}%`;
-        }).then((unityInstance) => {
-          unityGame = unityInstance;
-          loadingCover.style.display = "none";
-          if (canFullscreen) {
-            if (!hideFullScreenButton) {
-              fullscreenButton.style.display = "";
+      CustomCache.openDatabase().then(function() {
+        const script = document.createElement("script");
+        script.src = loaderUrl;
+        script.onload = () => {
+          createUnityInstance(canvas, config, (progress) => {
+            spinner.style.display = "none";
+            progressBarEmpty.style.display = "";
+            progressBarFull.style.width = `${100 * progress}%`;
+          }).then((unityInstance) => {
+            unityGame = unityInstance;
+            loadingCover.style.display = "none";
+            if (canFullscreen) {
+              if (!hideFullScreenButton) {
+                fullscreenButton.style.display = "";
+              }
+              fullscreenButton.onclick = () => {
+                unityInstance.SetFullscreen(1);
+              };
             }
-            fullscreenButton.onclick = () => {
-              unityInstance.SetFullscreen(1);
-            };
-          }
-        }).catch((message) => {
-          alert(message);
-        });
-      };
-      document.body.appendChild(script);
+          }).catch((message) => {
+            alert(message);
+          });
+        };
+        document.body.appendChild(script);
+      }).catch(function(error) {
+        console.error('Failed to open database:', error);
+      });
     </script>
     <script src="TemplateData/ReadyPlayerMe/ReadyPlayerMeFrame.js"></script>
 </body>
